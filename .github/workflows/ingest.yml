@@ -1,0 +1,40 @@
+name: Ingest state portals
+
+# Manual by default. Uncomment the schedule once the adapters have been verified
+# against the live portals (see README "Data: where it comes from").
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: "State slug (e.g. gujarat) or 'all'"
+        required: true
+        default: gujarat
+      limit:
+        description: "Max projects (blank = no limit)"
+        required: false
+  # schedule:
+  #   - cron: "30 21 * * *"   # 03:00 IST nightly
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          INGEST_DELAY_MS: "2000"
+          GUJRERA_LIST_URL: ${{ secrets.GUJRERA_LIST_URL }}
+          GUJRERA_DETAIL_URL: ${{ secrets.GUJRERA_DETAIL_URL }}
+        run: |
+          if [ "${{ github.event.inputs.state }}" = "all" ]; then
+            npm run ingest -- --all
+          else
+            npm run ingest -- --state "${{ github.event.inputs.state }}" ${{ github.event.inputs.limit && format('--limit {0}', github.event.inputs.limit) || '' }}
+          fi
